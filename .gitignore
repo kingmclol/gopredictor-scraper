@@ -1,0 +1,12 @@
+.venv
+__pycache__
+.env
+data.db
+endpoint.txt
+response_cancel.json
+response.json
+tsconfig.json
+node_modules
+index.ts
+package-lock.json
+package.json
