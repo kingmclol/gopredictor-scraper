@@ -1,3 +1,4 @@
 requests
 tzdata
-dotenv
+supabase
+python-dotenv

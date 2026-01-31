@@ -2,11 +2,15 @@ from pprint import pprint
 import requests
 from datetime import datetime, timedelta
 import json
-ENDPOINT = "https://www.gotracker.ca/gotracker/mobile/proxy/web/Messages/Departures/All"
-
 from entities import Trip
 from time import sleep
-from database_sql import *
+from database import Database
+from database_sql import SQLite
+from database_supabase import Supabase
+ENDPOINT = "https://www.gotracker.ca/gotracker/mobile/proxy/web/Messages/Departures/All"
+
+# database: Database = Supabase()
+database: Database = Supabase()
 
 def fetch_data():
 	res = requests.get(ENDPOINT)
@@ -84,7 +88,8 @@ def _parse_stops(stops_list) -> list[str]:
 
 if __name__ == "__main__":
 	times_fetched = 0
-
+	print(f"Starting scraper at {datetime.now().isoformat()}")
+	print(f"Using database: {type(database).__name__}\n")
 	while True:
 		data_json = fetch_data()
 		trips = parse_data_trips(data_json)
@@ -101,7 +106,7 @@ if __name__ == "__main__":
 				break
 		
 		if first_trip_unknown_platform: 
-			print(f"\nFirst trip with unknown platform: {first_trip_unknown_platform.line} at {first_trip_unknown_platform.departure_time.isoformat()}")
+			print(f"\nFirst trip with unknown platform: {first_trip_unknown_platform.line} at {first_trip_unknown_platform.departure_time.isoformat()}\n")
 
 			next_platform_reveal_time = first_trip_unknown_platform.departure_time -  timedelta(minutes = 8)
 
@@ -115,17 +120,18 @@ if __name__ == "__main__":
 			wait_time = 3600  # 1 hour
 			next_platform_reveal_time = datetime.now() + timedelta(seconds=wait_time)
 
-		times_fetched += 1
-		print(f"Times fetched: {times_fetched}. Next fetch at {next_platform_reveal_time.isoformat()} (in {wait_time} seconds)\n")
 
 
 		for known_platform_trip in [trip for trip in trips if trip.platforms]:
-			if not trip_exists(known_platform_trip):
-				create_trip(known_platform_trip)
+			if not database.trip_exists(known_platform_trip):
+				database.create_trip(known_platform_trip)
 				print(f"Stored trip: {known_platform_trip.line} at {known_platform_trip.departure_time.isoformat()} with platforms {known_platform_trip.platforms}")
 			else:
 				print(f"Trip already exists in database: {known_platform_trip.line} at {known_platform_trip.departure_time.isoformat()}")
 		
+		times_fetched += 1
+		print(f"Times fetched: {times_fetched}. Next fetch at {next_platform_reveal_time.isoformat()} (in {wait_time} seconds)")
+
 		if wait_time > 0:
 			sleep(wait_time)
 		sleep(5);
