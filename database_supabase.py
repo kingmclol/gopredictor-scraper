@@ -22,6 +22,16 @@ class Supabase(Database):
     response = supabase.table("trips").insert(data).execute()
     return response.data[0]["id"]
 
+  def upsert_trip(self, trip: Trip) -> int:
+    existing = supabase.table("trips").select("*").eq("departure_time", trip.departure_time.isoformat()).eq("line", trip.line).eq("number", trip.number).execute()
+    if existing.data:
+      supabase.table("trips").update(trip.to_dict()).eq("id", existing.data[0]["id"]).execute()
+      return existing.data[0]["id"]
+    
+    data = trip.to_dict()
+    response = supabase.table("trips").insert(data).execute()
+    return response.data[0]["id"]
+  
   def get_all_trips(self) -> list[Trip]:
     response = (
       supabase
@@ -48,3 +58,8 @@ class Supabase(Database):
     if len(response.data) > 0:
       return True
     return False
+  
+  def batch_upsert_trips(self, trips: list[Trip]) -> int:
+    data = [trip.to_dict() for trip in trips]
+    response = supabase.table("trips").upsert(data, on_conflict="departure_time,line,number").execute()
+    return len(response.data)

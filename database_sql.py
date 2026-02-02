@@ -94,6 +94,95 @@ class SQLite(Database):
         SELECT 1 FROM trips WHERE departure_time = ? AND line = ? 
       ''', (trip.departure_time.isoformat(), trip.line))
       return c.fetchone() is not None
+    
+  def upsert_trip(self, trip: Trip) -> int:
+        with self.get_connection() as conn:
+            c = conn.cursor()
+            c.execute('''
+                SELECT * FROM trips WHERE departure_time = ? AND line = ? AND number = ?
+            ''', (trip.departure_time.isoformat(), trip.line, trip.number))
+            row = c.fetchone()
+            if row:
+                c.execute('''
+                    UPDATE trips SET
+                        info = ?, platforms = ?, service_type = ?, is_express = ?,
+                        coach_count = ?, scheduled_coach_count = ?, stops = ?
+                    WHERE id = ?
+                ''', (
+                    trip.info,
+                    str(trip.platforms),
+                    trip.serviceType,
+                    trip.is_express,
+                    trip.coach_count,
+                    trip.scheduled_coach_count,
+                    str(trip.stops),
+                    row["id"]
+                ))
+                return row["id"]
+            
+            c.execute('''
+                INSERT INTO trips (
+                    info, number, platforms, line, service_type, is_express,
+                    departure_time, coach_count, scheduled_coach_count, stops
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                trip.info,
+                trip.number,
+                str(trip.platforms),
+                trip.line,
+                trip.serviceType,
+                trip.is_express,
+                trip.departure_time.isoformat(),
+                trip.coach_count,
+                trip.scheduled_coach_count,
+                str(trip.stops),
+            ))
+            return c.lastrowid
+        
+  def batch_upsert_trips(self, trips: list[Trip]) -> int:
+    with self.get_connection() as conn:
+      c = conn.cursor()
+      for trip in trips:
+        c.execute('''
+          SELECT * FROM trips WHERE departure_time = ? AND line = ? AND number = ?
+        ''', (trip.departure_time.isoformat(), trip.line, trip.number))
+        row = c.fetchone()
+        if row:
+          c.execute('''
+            UPDATE trips SET
+              info = ?, platforms = ?, service_type = ?, is_express = ?,
+              coach_count = ?, scheduled_coach_count = ?, stops = ?
+            WHERE id = ?
+          ''', (
+            trip.info,
+            str(trip.platforms),
+            trip.serviceType,
+            trip.is_express,
+            trip.coach_count,
+            trip.scheduled_coach_count,
+            str(trip.stops),
+            row["id"]
+          ))
+        else:
+          c.execute('''
+            INSERT INTO trips (
+              info, number, platforms, line, service_type, is_express,
+              departure_time, coach_count, scheduled_coach_count, stops
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ''', (
+            trip.info,
+            trip.number,
+            str(trip.platforms),
+            trip.line,
+            trip.serviceType,
+            trip.is_express,
+            trip.departure_time.isoformat(),
+            trip.coach_count,
+            trip.scheduled_coach_count,
+            str(trip.stops),
+          ))
+      conn.commit()
+      return c.rowcount;
 
 if __name__ == "__main__":
   initialize_database()

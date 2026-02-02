@@ -11,4 +11,10 @@ class Database(ABC):
 	@abstractmethod
 	def trip_exists(self, trip: Trip) -> bool:
 		raise NotImplementedError
+	@abstractmethod
+	def upsert_trip(self, trip: Trip) -> int:
+		raise NotImplementedError
+	@abstractmethod
+	def batch_upsert_trips(self, trips: list[Trip]) -> int:
+		raise NotImplementedError
 	

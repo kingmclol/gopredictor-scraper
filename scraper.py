@@ -8,8 +8,8 @@ from database import Database
 from database_sql import SQLite
 from database_supabase import Supabase
 ENDPOINT = "https://www.gotracker.ca/gotracker/mobile/proxy/web/Messages/Departures/All"
-
-# database: Database = Supabase()
+DELAY_BUFFER_SECS = 5
+# database: Database = SQLite()
 database: Database = Supabase()
 
 def fetch_data():
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 		if first_trip_unknown_platform: 
 			print(f"\nFirst trip with unknown platform: {first_trip_unknown_platform.line} at {first_trip_unknown_platform.departure_time.isoformat()}\n")
 
-			next_platform_reveal_time = first_trip_unknown_platform.departure_time -  timedelta(minutes = 8)
+			next_platform_reveal_time = first_trip_unknown_platform.departure_time -  timedelta(minutes = 9)
 
 			wait_time = (next_platform_reveal_time - datetime.now()).total_seconds()
 
@@ -118,20 +118,29 @@ if __name__ == "__main__":
 		else:
 			print("All trips have known platforms. Will check next hour.")
 			wait_time = 3600  # 1 hour
-			next_platform_reveal_time = datetime.now() + timedelta(seconds=wait_time)
 
+		wait_time += DELAY_BUFFER_SECS
+		next_fetch_time = datetime.now() + timedelta(seconds=wait_time)
+		rows_changed = database.batch_upsert_trips(trips);
 
-
-		for known_platform_trip in [trip for trip in trips if trip.platforms]:
-			if not database.trip_exists(known_platform_trip):
-				database.create_trip(known_platform_trip)
-				print(f"Stored trip: {known_platform_trip.line} at {known_platform_trip.departure_time.isoformat()} with platforms {known_platform_trip.platforms}")
-			else:
-				print(f"Trip already exists in database: {known_platform_trip.line} at {known_platform_trip.departure_time.isoformat()}")
+		print(f"{rows_changed} trips upserted")
+		# for trip in trips:
+		# 	if not database.trip_exists(trip):
+		# 		database.create_trip(trip)
+		# 		print(f"Stored trip: {trip.line} at {trip.departure_time.isoformat()} with platforms {trip.platforms}")
+		# 	else:
+		# 		print(f"Potentially updating trip: {trip.line} at {trip.departure_time.isoformat()} | {trip.platforms}")
+		# 		database.upsert_trip(trip)
+		# for known_platform_trip in [trip for trip in trips if trip.platforms]:
+		# 	if not database.trip_exists(known_platform_trip):
+		# 		database.create_trip(known_platform_trip)
+		# 		print(f"Stored trip: {known_platform_trip.line} at {known_platform_trip.departure_time.isoformat()} with platforms {known_platform_trip.platforms}")
+		# 	else:
+		# 		print(f"Trip already exists in database: {known_platform_trip.line} at {known_platform_trip.departure_time.isoformat()}")
 		
 		times_fetched += 1
-		print(f"Times fetched: {times_fetched}. Next fetch at {next_platform_reveal_time.isoformat()} (in {wait_time} seconds)")
+		print(f"Times fetched: {times_fetched}. Next fetch at {next_fetch_time.isoformat()} (in {wait_time} seconds)")
 
 		if wait_time > 0:
 			sleep(wait_time)
-		sleep(5);
+		sleep(DELAY_BUFFER_SECS);
