@@ -60,6 +60,8 @@ class Supabase(Database):
     return False
   
   def batch_upsert_trips(self, trips: list[Trip]) -> int:
+    if not trips:
+      return 0
     data = [trip.to_dict() for trip in trips]
     response = supabase.table("trips").upsert(data, on_conflict="departure_time,line,number").execute()
     return len(response.data)
